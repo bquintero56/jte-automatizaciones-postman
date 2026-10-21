@@ -30,4 +30,12 @@ jte-pipelines-template/
 3. Plugin Email Extension con SMTP configurado.
 4. Commit y push, y lanza el job una vez a mano: registra el cron.
 
+## OAuth 2.0
+
+Si un endpoint necesita token (como *Get New Access Token* en Postman):
+
+1. En Jenkins crea una credencial **Username with password**: usuario = Client ID, contraseña = Client Secret.
+2. En la config agrega una entrada en `autenticaciones` (`nombre`, `tokenUrl`, `scope`, `credentialsId`, `grantType`).
+3. En el endpoint pon `auth: '<nombre>'`: se envía `Authorization: Bearer <token>`.
+
 **El repo es público:** no pongas tokens ni contraseñas en la config; usa credenciales de Jenkins.

@@ -49,7 +49,8 @@ jte-automations-pipeline-libraries/
 │   ├── library_config.groovy
 │   └── steps/
 │       ├── programar_ejecuciones.groovy      cron diario (config.hora + zonaHoraria)
-│       └── probar_endpoints.groovy           curl a cada endpoint y comparación del código
+│       ├── obtener_tokens_oauth.groovy       token OAuth 2.0 por cada entrada de config.autenticaciones
+│       └── probar_endpoints.groovy           curl a cada endpoint (con Bearer si tiene auth) y comparación del código
 └── notificacion_correo/
     ├── library_config.groovy                 destinatarios, copia (opcional), asunto
     └── steps/enviar_correo_endpoints.groovy  correo con la tabla de resultados
@@ -83,15 +84,24 @@ jte-pipelines-template/
 
 - **Config (`pruebas_endpoints`):** `zonaHoraria`, `hora` (HH:mm), `codigoEsperado` (200), `timeoutSegundos`, `estadoSiFallan`,
   `endpoints` (lista). Cada endpoint: `nombre`, `url` (obligatorios); `metodo` (GET por defecto), `esperado` (sobrescribe
-  `codigoEsperado`, ej. 201 en un POST), `headers` (mapa), `body` (texto).
+  `codigoEsperado`, ej. 201 en un POST), `headers` (mapa), `body` (texto), `auth` (nombre de una entrada de `autenticaciones`).
+- **OAuth 2.0 (`autenticaciones`, opcional):** lista con `nombre`, `tokenUrl`, `credentialsId` (obligatorios), `scope`, `grantType`
+  (`client_credentials` por defecto). Equivale a *Configure New Token → Get New Access Token* de Postman con *Client Authentication =
+  Send as Basic Auth header*. El Client ID/Secret viven en una credencial Jenkins **Username with password** (usuario = Client ID,
+  contraseña = Client Secret). *Token Name* de Postman = `nombre`.
+- **Step `obtener_tokens_oauth()`** (stage `OAuth: obtener tokens`): por cada autenticación hace `POST tokenUrl` con `curl -u` +
+  `--data-urlencode grant_type/scope`, extrae `access_token` con `sed` (sin plugins) y lo deja en `oauth_token_<n>.txt` del workspace.
+  El token **nunca** pasa por Groovy ni por el log: el `sh` del endpoint lo lee con `$(cat archivo)`. Devuelve
+  `nombre → [archivo, ok, codigo, detalle]`, que se pasa a `probar_endpoints(tokens)`. Si no hay token, los endpoints con ese `auth`
+  no se llaman y quedan `ERROR` (código `000`) con el motivo en `detalle`.
 - **Ejecución:** `programar_ejecuciones()` registra el cron diario a `hora` en `zonaHoraria`; cada ejecución prueba **todos** los endpoints.
 - **Step `probar_endpoints()`**: por endpoint devuelve `[nombre, metodo, url, esperado, codigo, tiempoMs, estatus, detalle, fecha]`.
 - **Correo (`enviar_correo_endpoints`)**: se envía **siempre**.
 
 ## 5. Puntos a confirmar / pendientes
 
-1. **Autenticación:** si los endpoints piden token o usuario/clave, **no** ponerlos en la config (el repo es **público**). Usar credenciales
-   de Jenkins (`withCredentials`) y referenciar el `credentialsId` desde la config.
+1. **Autenticación:** OAuth 2.0 resuelto (`autenticaciones` + `obtener_tokens_oauth`). Confirmar que el *Grant Type* real sea
+   `client_credentials`; si es otro (password, authorization code) hay que ampliar el step. Nunca secretos en la config (repo **público**).
 2. **¿Colecciones de Postman?** Si las pruebas ya existen como colección de Postman, se puede ejecutar con **Newman** en el nodo en vez de
    mantener la lista en la config (requiere Node.js + `newman` en el agente). Decidir.
 3. **Validaciones extra:** hoy solo se compara el código HTTP. Posibles: tiempo máximo de respuesta, contenido del cuerpo, certificado.
