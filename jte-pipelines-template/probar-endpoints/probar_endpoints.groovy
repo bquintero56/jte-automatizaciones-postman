@@ -8,8 +8,14 @@ timeout(time: execution.time, unit: execution.units) {
     node(jenkins_agent_label) {
         withFolderProperties {
             try {
+                def tokens = [:]
+
+                stage('OAuth: obtener tokens') {
+                    tokens = obtener_tokens_oauth()
+                }
+
                 stage('HTTP: probar endpoints') {
-                    resultados = probar_endpoints()
+                    resultados = probar_endpoints(tokens)
                 }
 
                 stage('Notificación: enviar correo') {

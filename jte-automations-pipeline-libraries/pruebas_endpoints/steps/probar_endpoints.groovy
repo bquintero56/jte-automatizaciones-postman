@@ -1,6 +1,7 @@
 // Prueba cada endpoint de config.endpoints con curl y compara el código HTTP con el esperado.
+// tokens: lo que devuelve obtener_tokens_oauth() (nombre de la autenticación → [archivo, ok, codigo, detalle]).
 // Devuelve una lista; por endpoint: [nombre, metodo, url, esperado, codigo, tiempoMs, estatus, detalle, fecha].
-List call() {
+List call(Map tokens = [:]) {
     def resultados = []
     def errores    = []
 
@@ -14,7 +15,8 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
 
     echo "Fecha: ${fecha} | Endpoints a probar: ${config.endpoints.size()} | Timeout: ${config.timeoutSegundos} s"
 
-    config.endpoints.each { ep ->
+    for (int i = 0; i < config.endpoints.size(); i++) {
+        def ep       = config.endpoints[i]
         def metodo   = (ep.metodo ?: 'GET').toString().toUpperCase()
         def esperado = (ep.esperado ?: config.codigoEsperado) as Integer
 
@@ -26,6 +28,19 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
             }
         }
 
+        // OAuth 2.0: el sh lee el token del archivo, así no pasa por Groovy ni aparece en el log
+        def detalleAuth = ''
+        if (ep.auth) {
+            def t = tokens[ep.auth]
+            if (!t) {
+                detalleAuth = "Autenticación '${ep.auth}' no definida en autenticaciones"
+            } else if (!t.ok) {
+                detalleAuth = t.detalle
+            } else {
+                headers += " -H \"Authorization: Bearer \$(cat ${t.archivo})\""
+            }
+        }
+
         // El cuerpo va a un archivo para no tener problemas con comillas dentro del JSON
         def data = ''
         if (ep.body) {
@@ -33,20 +48,24 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
             data = '--data-binary @endpoint_body.txt'
         }
 
-        // -w imprime "codigo tiempo"; si no hay respuesta (DNS, conexión, timeout) curl devuelve 000
-        def salida = sh(
-            returnStdout: true,
-            script: """#!/bin/sh
+        // -w imprime "codigo tiempo"; si no hay respuesta (DNS, conexión, timeout) curl devuelve 000.
+        // Sin token no se llama al endpoint: queda en ERROR con el motivo.
+        def salida = '000 0'
+        if (!detalleAuth) {
+            salida = sh(
+                returnStdout: true,
+                script: """#!/bin/sh
 curl -s -o /dev/null -w '%{http_code} %{time_total}' -X ${metodo} ${headers} ${data} \\
     --max-time ${config.timeoutSegundos} '${ep.url}' || true
 """
-        ).trim()
+            ).trim()
+        }
 
         def partes   = salida.split(' ')
         def codigo   = partes[0]
         def tiempoMs = (partes.size() > 1) ? Math.round(partes[1].toDouble() * 1000) : 0
         def ok       = (codigo == esperado.toString())
-        def detalle  = (codigo == '000') ? 'Sin respuesta (DNS, conexión o timeout)' : ''
+        def detalle  = detalleAuth ?: ((codigo == '000') ? 'Sin respuesta (DNS, conexión o timeout)' : '')
 
         if (ok) {
             echo "✅ [${metodo}] ${ep.nombre} → ${codigo} (${tiempoMs} ms)"
