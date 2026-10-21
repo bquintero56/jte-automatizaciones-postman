@@ -1,7 +1,8 @@
 // Prueba cada endpoint de config.endpoints con curl y compara el código HTTP con el esperado.
 // tokens: lo que devuelve obtener_tokens_oauth() (nombre de la autenticación → [archivo, ok, codigo, detalle]).
+// proxy: opciones de curl que entrega con_proxy ('' = sin proxy); usarProxy: false en el endpoint lo omite.
 // Devuelve una lista; por endpoint: [nombre, metodo, url, esperado, codigo, tiempoMs, estatus, detalle, fecha].
-List call(Map tokens = [:]) {
+List call(Map tokens = [:], String proxy = '') {
     def resultados = []
     def errores    = []
 
@@ -19,6 +20,7 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
         def ep       = config.endpoints[i]
         def metodo   = (ep.metodo ?: 'GET').toString().toUpperCase()
         def esperado = (ep.esperado ?: config.codigoEsperado) as Integer
+        def opcProxy = (ep.usarProxy == false) ? "--noproxy '*'" : proxy
 
         // Cabeceras: una opción -H por cada una
         def headers = ''
@@ -55,7 +57,7 @@ TZ='${config.zonaHoraria}' date +'%Y-%m-%d %H:%M'
             salida = sh(
                 returnStdout: true,
                 script: """#!/bin/sh
-curl -s -o /dev/null -w '%{http_code} %{time_total}' -X ${metodo} ${headers} ${data} \\
+curl -s -o /dev/null -w '%{http_code} %{time_total}' -X ${metodo} ${opcProxy} ${headers} ${data} \\
     --max-time ${config.timeoutSegundos} '${ep.url}' || true
 """
             ).trim()

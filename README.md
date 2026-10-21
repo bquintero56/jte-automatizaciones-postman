@@ -38,4 +38,9 @@ Si un endpoint necesita token (como *Get New Access Token* en Postman):
 2. En la config agrega una entrada en `autenticaciones` (`nombre`, `tokenUrl`, `scope`, `credentialsId`, `grantType`).
 3. En el endpoint pon `auth: '<nombre>'`: se envía `Authorization: Bearer <token>`.
 
+## Proxy
+
+Si el nodo necesita proxy para llegar a las URLs, pon `proxy = 'http://host:puerto'` en la config. Si el proxy pide usuario, crea una
+credencial **Username with password** y pon su ID en `proxyCredentialsId`. Un endpoint o autenticación con `usarProxy: false` sale directo.
+
 **El repo es público:** no pongas tokens ni contraseñas en la config; usa credenciales de Jenkins.

@@ -1,8 +1,9 @@
 // Obtiene un token OAuth 2.0 por cada entrada de config.autenticaciones (lo mismo que "Get New Access Token" en Postman).
 // Client ID y Client Secret salen de una credencial de Jenkins "Username with password" (credentialsId) y viajan en un
 // header Basic Auth (curl -u). El token queda en un archivo del workspace (lo borra clean_job_workspace) y nunca se imprime.
+// proxy: opciones de curl que entrega con_proxy ('' = sin proxy); usarProxy: false en la autenticación lo omite.
 // Devuelve un mapa: nombre de la autenticación → [archivo, ok, codigo, detalle].
-Map call() {
+Map call(String proxy = '') {
     def tokens          = [:]
     def autenticaciones = config.autenticaciones ?: []
 
@@ -15,6 +16,7 @@ Map call() {
         def grantType = a.grantType ?: 'client_credentials'
         def archivo   = "oauth_token_${i + 1}.txt"
         def scope     = a.scope ? "--data-urlencode 'scope=${a.scope}'" : ''
+        def opcProxy  = (a.usarProxy == false) ? "--noproxy '*'" : proxy
 
         // Los secretos se usan como variables de shell (\$OAUTH_...), no se interpolan en Groovy
         def salida = ''
@@ -24,7 +26,7 @@ Map call() {
             salida = sh(
                 returnStdout: true,
                 script: """#!/bin/sh
-codigo=\$(curl -s -o oauth_respuesta.json -w '%{http_code}' -X POST \\
+codigo=\$(curl -s -o oauth_respuesta.json -w '%{http_code}' -X POST ${opcProxy} \\
     -u "\$OAUTH_CLIENT_ID:\$OAUTH_CLIENT_SECRET" \\
     --data-urlencode 'grant_type=${grantType}' ${scope} \\
     --max-time ${config.timeoutSegundos} '${a.tokenUrl}' || true)

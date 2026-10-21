@@ -8,14 +8,17 @@ timeout(time: execution.time, unit: execution.units) {
     node(jenkins_agent_label) {
         withFolderProperties {
             try {
-                def tokens = [:]
+                // Token y endpoints salen por el proxy de la config (si hay); el correo no lo necesita
+                con_proxy { proxy ->
+                    def tokens = [:]
 
-                stage('OAuth: obtener tokens') {
-                    tokens = obtener_tokens_oauth()
-                }
+                    stage('OAuth: obtener tokens') {
+                        tokens = obtener_tokens_oauth(proxy)
+                    }
 
-                stage('HTTP: probar endpoints') {
-                    resultados = probar_endpoints(tokens)
+                    stage('HTTP: probar endpoints') {
+                        resultados = probar_endpoints(tokens, proxy)
+                    }
                 }
 
                 stage('Notificación: enviar correo') {

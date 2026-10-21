@@ -49,6 +49,7 @@ jte-automations-pipeline-libraries/
 │   ├── library_config.groovy
 │   └── steps/
 │       ├── programar_ejecuciones.groovy      cron diario (config.hora + zonaHoraria)
+│       ├── con_proxy.groovy                  entrega al bloque las opciones de proxy de curl (con credencial si aplica)
 │       ├── obtener_tokens_oauth.groovy       token OAuth 2.0 por cada entrada de config.autenticaciones
 │       └── probar_endpoints.groovy           curl a cada endpoint (con Bearer si tiene auth) y comparación del código
 └── notificacion_correo/
@@ -94,6 +95,11 @@ jte-pipelines-template/
   El token **nunca** pasa por Groovy ni por el log: el `sh` del endpoint lo lee con `$(cat archivo)`. Devuelve
   `nombre → [archivo, ok, codigo, detalle]`, que se pasa a `probar_endpoints(tokens)`. Si no hay token, los endpoints con ese `auth`
   no se llaman y quedan `ERROR` (código `000`) con el motivo en `detalle`.
+- **Proxy (`proxy`, `proxyCredentialsId`, opcionales):** `con_proxy { proxy -> ... }` envuelve en el template los stages de OAuth y
+  endpoints y les pasa el texto `--proxy '<url>' [--proxy-user "$PROXY_USER:$PROXY_PASS"]`, que cada `curl` agrega. El usuario del
+  proxy sale de una credencial **Username with password** (`withCredentials`), como variables de shell, nunca en Groovy ni en el log.
+  `proxy` vacío = sin opción (curl usa las variables `http(s)_proxy` del nodo si existen). `usarProxy: false` en un endpoint o en una
+  autenticación = `--noproxy '*'` (sale directo). El correo no usa proxy.
 - **Ejecución:** `programar_ejecuciones()` registra el cron diario a `hora` en `zonaHoraria`; cada ejecución prueba **todos** los endpoints.
 - **Step `probar_endpoints()`**: por endpoint devuelve `[nombre, metodo, url, esperado, codigo, tiempoMs, estatus, detalle, fecha]`.
 - **Correo (`enviar_correo_endpoints`)**: se envía **siempre**.
